@@ -1,3 +1,5 @@
+TODO: Replace Unknown:account by Expenses:unknown and Income:unknown depending on the sign.
+
 # Beancount importer for Volksbank & GLS Bank
 
 This is an importer for [beancount](https://github.com/beancount/beancount) to convert CSV files exported from the online banking of Volksbank or GLS Bank. 

@@ -2,7 +2,7 @@
 #
 # Beancount importer for csv exports from Volksbank or GLS Bank.
 # Author: Frank Stollmeier
-# License: GNU GPLv2
+# License: GNU GPLv3
 #
 
 
