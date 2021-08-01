@@ -79,7 +79,7 @@ class VolksbankImporter(importer.ImporterProtocol):
                 share = float(unit.number) / s
                 if prev_posting_had_reversed_signs:
                     share = -share
-                p = data.Posting(account, amount.Amount(D(str(share*abs(total_transaction_value))), self.currency), None, None, None, None)
+                p = data.Posting(account, amount.Amount(D(str(round(share*abs(total_transaction_value),2))), self.currency), None, None, None, None)
                 new_postings.append(p)
             #move importing_account to the end of the list
             i = 0
@@ -109,7 +109,7 @@ class VolksbankImporter(importer.ImporterProtocol):
         #create transactions
         entries = []
         for i in range(len(buchungstag)):
-            postings = self.guess_postings(auftraggeber_empfaenger[i], float(betrag[i])) 
+            postings = self.guess_postings(auftraggeber_empfaenger[i], float(betrag[i]) ) 
             meta = data.new_metadata(file.name, indices[i])
             txn = data.Transaction(meta, buchungstag[i], self.flag, auftraggeber_empfaenger[i], verwendungszweck[i], data.EMPTY_SET, data.EMPTY_SET, postings)
             entries.append(txn)
