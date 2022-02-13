@@ -35,6 +35,7 @@ class VolksbankImporter(importer.ImporterProtocol):
         self.currency = currency
         self.flag = flag
         self.initialize_guessing()
+        self.file_format_version = None
         
     def initialize_guessing(self):
         '''Create a dictionary of the previous transactions in 'target_journal', which can be used to guess the right postings for the new transactions.'''
@@ -93,10 +94,15 @@ class VolksbankImporter(importer.ImporterProtocol):
         return new_postings
         
     def identify(self, file):
-        header = '"Buchungstag";"Valuta";"Auftraggeber/Zahlungsempfänger";"Empfänger/Zahlungspflichtiger";"Konto-Nr.";"IBAN";"BLZ";"BIC";"Vorgang/Verwendungszweck";"Kundenreferenz";"Währung";"Umsatz";" "'
+        header_version1 = '"Buchungstag";"Valuta";"Auftraggeber/Zahlungsempfänger";"Empfänger/Zahlungspflichtiger";"Konto-Nr.";"IBAN";"BLZ";"BIC";"Vorgang/Verwendungszweck";"Kundenreferenz";"Währung";"Umsatz";" "'
+        header_version2 = "Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;ZahlungsempfängerKto;ZahlungsempfängerIBAN;ZahlungsempfängerBLZ;ZahlungsempfängerBIC;Vorgang/Verwendungszweck;Kundenreferenz;Währung;Umsatz;Soll/Haben"
         with open(file.name, "r", encoding = "ISO-8859-1") as f:
             for line in f:
-                if header in line:
+                if header_version1 in line:
+                    self.file_format_version = 1
+                    return True
+                elif header_version2 in line:
+                    self.file_format_version = 2
                     return True
             return False
 
@@ -105,7 +111,12 @@ class VolksbankImporter(importer.ImporterProtocol):
 
     def extract(self, file):
         #parse csv file
-        buchungstag, auftraggeber_empfaenger, buchungstext, verwendungszweck, betrag, kontostand, indices, endsaldo = parse_csv_file(file.name)
+        if self.file_format_version == 1:
+            buchungstag, auftraggeber_empfaenger, buchungstext, verwendungszweck, betrag, kontostand, indices, endsaldo = parse_csv_file_v1(file.name)
+        elif self.file_format_version == 2:
+            buchungstag, auftraggeber_empfaenger, buchungstext, verwendungszweck, betrag, kontostand, indices, endsaldo = parse_csv_file_v2(file.name)
+        else:
+            raise IOError("Unknown file format.")
         #create transactions
         entries = []
         for i in range(len(buchungstag)):
@@ -143,7 +154,7 @@ def convert_date(date):
     return datetime.date(int(year),int(month),int(day))
 
 
-def parse_csv_file(filename):
+def parse_csv_file_v1(filename):
     '''Parse CSV file.
     
     Parameters
@@ -197,3 +208,51 @@ def parse_csv_file(filename):
             
     return buchungstag, auftraggeber_empfaenger, buchungstext, verwendungszweck, betrag, kontostand, linenumbers, endsaldo
 
+def parse_csv_file_v2(filename):
+    '''Parse CSV file with the new file format they started to use at the beginning of 2022.
+    
+    Parameters
+    ----------
+    filename:   string
+    '''
+    buchungstag = []
+    auftraggeber_empfaenger = []
+    buchungstext = []
+    verwendungszweck = []
+    betrag = []
+    kontostand = []
+    endsaldo = None
+    
+    linenumbers = []
+    header = True
+    collector = ""
+    linenumber = -1
+    
+    f = open(filename, 'r', encoding = 'iso-8859-1')
+    for line in f:
+        linenumber += 1
+        #skip header
+        if header:
+            if "Valuta" in line:
+                header = False  
+            continue
+        
+        values = line.split(';')
+        if len(values[0]) == 0:
+            continue
+        if values[10] == 'Endsaldo':
+            date = convert_date(values[0])
+            amount = convert_value(values[12], values[13])
+            endsaldo = (date, amount, linenumber)
+        elif values[10] == 'Anfangssaldo':
+            continue
+        else:
+            buchungstag.append(convert_date(values[0]))
+            auftraggeber_empfaenger.append(values[4])
+            buchungstext.append('')
+            verwendungszweck.append(values[9])
+            betrag.append(convert_value(values[12], values[13]))
+            kontostand.append(None)
+            linenumbers.append(linenumber)
+            
+    return buchungstag, auftraggeber_empfaenger, buchungstext, verwendungszweck, betrag, kontostand, linenumbers, endsaldo
