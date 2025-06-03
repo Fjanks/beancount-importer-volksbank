@@ -97,6 +97,7 @@ class VolksbankImporter(importer.ImporterProtocol):
         header_version1 = '"Buchungstag";"Valuta";"Auftraggeber/Zahlungsempfänger";"Empfänger/Zahlungspflichtiger";"Konto-Nr.";"IBAN";"BLZ";"BIC";"Vorgang/Verwendungszweck";"Kundenreferenz";"Währung";"Umsatz";" "'
         header_version2 = "Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;ZahlungsempfängerKto;ZahlungsempfängerIBAN;ZahlungsempfängerBLZ;ZahlungsempfängerBIC;Vorgang/Verwendungszweck;Kundenreferenz;Währung;Umsatz;Soll/Haben"
         header_version3 = "Bezeichnung Auftragskonto;IBAN Auftragskonto;BIC Auftragskonto;Bankname Auftragskonto;Buchungstag;Valutadatum;Name Zahlungsbeteiligter;IBAN Zahlungsbeteiligter;BIC (SWIFT-Code) Zahlungsbeteiligter;Buchungstext;Verwendungszweck;Betrag;Waehrung;Saldo nach Buchung;Bemerkung;Kategorie;Steuerrelevant;Glaeubiger ID;Mandatsreferenz"
+        header_version4 = "Bezeichnung Auftragskonto;IBAN Auftragskonto;BIC Auftragskonto;Bankname Auftragskonto;Buchungstag;Valutadatum;Name Zahlungsbeteiligter;IBAN Zahlungsbeteiligter;BIC (SWIFT-Code) Zahlungsbeteiligter;Buchungstext;Verwendungszweck;Betrag;Waehrung;Saldo nach Buchung;Bemerkung;Gekennzeichneter Umsatz;Glaeubiger ID;Mandatsreferenz"
         with open(file.name, "r", encoding = "ISO-8859-1") as f:
             for line in f:
                 if header_version1 in line:
@@ -107,6 +108,9 @@ class VolksbankImporter(importer.ImporterProtocol):
                     return True
                 elif header_version3 in line:
                     self.file_format_version = 3
+                    return True
+                elif header_version4 in line:
+                    self.file_format_version = 4
                     return True
             print('Unable to identify file format.')
             return False
@@ -122,6 +126,8 @@ class VolksbankImporter(importer.ImporterProtocol):
             buchungstag, auftraggeber_empfaenger, buchungstext, verwendungszweck, betrag, kontostand, indices, endsaldo = parse_csv_file_v2(file.name)
         elif self.file_format_version == 3:
             buchungstag, auftraggeber_empfaenger, buchungstext, verwendungszweck, betrag, kontostand, indices, endsaldo = parse_csv_file_v3(file.name)
+        elif self.file_format_version == 4:
+            buchungstag, auftraggeber_empfaenger, buchungstext, verwendungszweck, betrag, kontostand, indices, endsaldo = parse_csv_file_v3(file.name)    
         else:
             raise IOError("Unknown file format.")
         #create transactions
