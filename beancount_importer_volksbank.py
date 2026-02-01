@@ -11,12 +11,12 @@ from beancount.core.number import D
 from beancount.core import data
 from beancount.core import amount
 from beancount.core import position
-from beancount.ingest import importer
+from beangulp.importer import Importer
 from beancount import loader
 
 
 
-class VolksbankImporter(importer.ImporterProtocol):
+class VolksbankImporter(Importer):
     '''An importer for CSV export from a Volksbank online banking.'''
 
     def __init__(self, importing_account, default_adjacent_account = "Unknown:account", target_journal = None, currency = 'EUR', flag = '!'):
@@ -29,7 +29,7 @@ class VolksbankImporter(importer.ImporterProtocol):
         currency:                   string, optional. Default is 'EUR'
         flag:                       char, optional. Default is '!'
         '''
-        self.account = importing_account
+        self._account = importing_account
         self.default_adjacent_account = default_adjacent_account
         self.target_journal = target_journal
         self.currency = currency
@@ -45,7 +45,7 @@ class VolksbankImporter(importer.ImporterProtocol):
             entries = [e for e in entries if isinstance(e, data.Transaction)]
             entries = sorted(entries, key = lambda e: e.date)
             for entry in entries:
-                if not (self.account in [p.account for p in entry.postings]):
+                if not (self._account in [p.account for p in entry.postings]):
                     continue
                 if entry.payee is None:
                     continue
@@ -73,7 +73,7 @@ class VolksbankImporter(importer.ImporterProtocol):
             for prev_posting in previous_postings:
                 accounts.append(prev_posting.account)
                 units.append(prev_posting.units)
-                if prev_posting.account == self.account:
+                if prev_posting.account == self._account:
                     prev_posting_had_reversed_signs = 0 > float(prev_posting.units.number) * total_transaction_value
             s = sum([float(u.number) for u in units if u.number > 0])
             for account,unit in zip(accounts,units):
@@ -85,20 +85,20 @@ class VolksbankImporter(importer.ImporterProtocol):
             #move importing_account to the end of the list
             i = 0
             for j,posting in enumerate(new_postings):
-                if posting.account == self.account:
+                if posting.account == self._account:
                     i = j
             new_postings.append(new_postings.pop(i))
         else:
             new_postings.append(data.Posting(self.default_adjacent_account, amount.Amount(D(str(-total_transaction_value)), self.currency), None, None, None, None))
-            new_postings.append(data.Posting(self.account, amount.Amount(D(str(total_transaction_value)), self.currency), None, None, None, None))
+            new_postings.append(data.Posting(self._account, amount.Amount(D(str(total_transaction_value)), self.currency), None, None, None, None))
         return new_postings
         
-    def identify(self, file):
+    def identify(self, filename):
         header_version1 = '"Buchungstag";"Valuta";"Auftraggeber/Zahlungsempfänger";"Empfänger/Zahlungspflichtiger";"Konto-Nr.";"IBAN";"BLZ";"BIC";"Vorgang/Verwendungszweck";"Kundenreferenz";"Währung";"Umsatz";" "'
         header_version2 = "Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;ZahlungsempfängerKto;ZahlungsempfängerIBAN;ZahlungsempfängerBLZ;ZahlungsempfängerBIC;Vorgang/Verwendungszweck;Kundenreferenz;Währung;Umsatz;Soll/Haben"
         header_version3 = "Bezeichnung Auftragskonto;IBAN Auftragskonto;BIC Auftragskonto;Bankname Auftragskonto;Buchungstag;Valutadatum;Name Zahlungsbeteiligter;IBAN Zahlungsbeteiligter;BIC (SWIFT-Code) Zahlungsbeteiligter;Buchungstext;Verwendungszweck;Betrag;Waehrung;Saldo nach Buchung;Bemerkung;Kategorie;Steuerrelevant;Glaeubiger ID;Mandatsreferenz"
         header_version4 = "Bezeichnung Auftragskonto;IBAN Auftragskonto;BIC Auftragskonto;Bankname Auftragskonto;Buchungstag;Valutadatum;Name Zahlungsbeteiligter;IBAN Zahlungsbeteiligter;BIC (SWIFT-Code) Zahlungsbeteiligter;Buchungstext;Verwendungszweck;Betrag;Waehrung;Saldo nach Buchung;Bemerkung;Gekennzeichneter Umsatz;Glaeubiger ID;Mandatsreferenz"
-        with open(file.name, "r", encoding = "ISO-8859-1") as f:
+        with open(filename, "r", encoding = "ISO-8859-1") as f:
             for line in f:
                 if header_version1 in line:
                     self.file_format_version = 1
@@ -115,31 +115,31 @@ class VolksbankImporter(importer.ImporterProtocol):
             print('Unable to identify file format.')
             return False
 
-    def file_account(self, file):
-        return self.account
+    def account(self, file):
+        return self._account
 
-    def extract(self, file):
+    def extract(self, filename, _):
         #parse csv file
         if self.file_format_version == 1:
-            buchungstag, auftraggeber_empfaenger, buchungstext, verwendungszweck, betrag, kontostand, indices, endsaldo = parse_csv_file_v1(file.name)
+            buchungstag, auftraggeber_empfaenger, buchungstext, verwendungszweck, betrag, kontostand, indices, endsaldo = parse_csv_file_v1(filename)
         elif self.file_format_version == 2:
-            buchungstag, auftraggeber_empfaenger, buchungstext, verwendungszweck, betrag, kontostand, indices, endsaldo = parse_csv_file_v2(file.name)
+            buchungstag, auftraggeber_empfaenger, buchungstext, verwendungszweck, betrag, kontostand, indices, endsaldo = parse_csv_file_v2(filename)
         elif self.file_format_version == 3:
-            buchungstag, auftraggeber_empfaenger, buchungstext, verwendungszweck, betrag, kontostand, indices, endsaldo = parse_csv_file_v3(file.name)
+            buchungstag, auftraggeber_empfaenger, buchungstext, verwendungszweck, betrag, kontostand, indices, endsaldo = parse_csv_file_v3(filename)
         elif self.file_format_version == 4:
-            buchungstag, auftraggeber_empfaenger, buchungstext, verwendungszweck, betrag, kontostand, indices, endsaldo = parse_csv_file_v3(file.name)    
+            buchungstag, auftraggeber_empfaenger, buchungstext, verwendungszweck, betrag, kontostand, indices, endsaldo = parse_csv_file_v3(filename)    
         else:
             raise IOError("Unknown file format.")
         #create transactions
         entries = []
         for i in range(len(buchungstag)):
             postings = self.guess_postings(auftraggeber_empfaenger[i], float(betrag[i]) ) 
-            meta = data.new_metadata(file.name, indices[i])
+            meta = data.new_metadata(filename, indices[i])
             txn = data.Transaction(meta, buchungstag[i], self.flag, auftraggeber_empfaenger[i], verwendungszweck[i], data.EMPTY_SET, data.EMPTY_SET, postings)
             entries.append(txn)
         #create balance
-        meta = data.new_metadata(file.name, endsaldo[2])
-        entries.append( data.Balance(meta, endsaldo[0] + datetime.timedelta(days=1), self.account, amount.Amount(D(endsaldo[1]), self.currency), None, None) )
+        meta = data.new_metadata(filename, endsaldo[2])
+        entries.append( data.Balance(meta, endsaldo[0] + datetime.timedelta(days=1), self._account, amount.Amount(D(endsaldo[1]), self.currency), None, None) )
         
         return entries
 
