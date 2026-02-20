@@ -24,7 +24,7 @@ class VolksbankImporter(Importer):
         Parameters
         ----------
         importing_account:          string, name of account belonging to the csv export (one leg of the transaction)
-        default_adjacent_account:   string, default account to collect the expenses (other leg of the transaction)
+        default_adjacent_account:   string, optional. Default account to collect the expenses (other leg of the transaction). If set to `None`, and no guess could be made based on previous transactions, no other leg is added
         target_journal:             string, optional. Filename of the target journal to guess the corresponding account names instead of using the default_adjacent_account (the other leg of the transaction)
         currency:                   string, optional. Default is 'EUR'
         flag:                       char, optional. Default is '!'
@@ -89,7 +89,8 @@ class VolksbankImporter(Importer):
                     i = j
             new_postings.append(new_postings.pop(i))
         else:
-            new_postings.append(data.Posting(self.default_adjacent_account, amount.Amount(D(str(-total_transaction_value)), self.currency), None, None, None, None))
+            if self.default_adjacent_account != None:
+                new_postings.append(data.Posting(self.default_adjacent_account, amount.Amount(D(str(-total_transaction_value)), self.currency), None, None, None, None))
             new_postings.append(data.Posting(self._account, amount.Amount(D(str(total_transaction_value)), self.currency), None, None, None, None))
         return new_postings
         
