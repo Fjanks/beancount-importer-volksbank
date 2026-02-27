@@ -113,7 +113,6 @@ class VolksbankImporter(Importer):
                 elif header_version4 in line:
                     self.file_format_version = 4
                     return True
-            print('Unable to identify file format.')
             return False
 
     def account(self, file):
@@ -196,38 +195,38 @@ def parse_csv_file_v1(filename):
     collector = ""
     linenumber = -1
     
-    f = open(filename, 'r', encoding = 'iso-8859-1')
-    for line in f:
-        linenumber += 1
-        #skip header
-        if header:
-            if "Valuta" in line:
-                header = False  
-            continue
-        #skip empty lines
-        if len(line) == 0:
-            continue
-        #Each transaction in the csv file is splitted over several lines, so we have to collect the content of several lines until the transaction is complete: 
-        collector = collector + line.replace('\n',' ')
-        if '"S"' in collector or '"H"' in collector:
-            if "Anfangssaldo" in collector:
-                pass
-            elif "Endsaldo" in collector:
-                result = collector.split(';')
-                date = result[0]
-                amount = convert_value(result[11], result[12].replace('"',''))
-                endsaldo = (convert_date(date),amount, linenumber)
-            else:
-                values = collector.split(';')
-                buchungstag.append(convert_date(values[0]))
-                auftraggeber_empfaenger.append(values[3].replace('"',''))
-                buchungstext.append('')
-                verwendungszweck.append(values[8].replace('"',''))
-                betrag.append(convert_value(values[11], collector[-3:]))
-                kontostand.append(None)
-                linenumbers.append(linenumber)
-            collector = ""
-            
+    with open(filename, 'r', encoding = 'iso-8859-1') as f:
+        for line in f:
+            linenumber += 1
+            #skip header
+            if header:
+                if "Valuta" in line:
+                    header = False  
+                continue
+            #skip empty lines
+            if len(line) == 0:
+                continue
+            #Each transaction in the csv file is splitted over several lines, so we have to collect the content of several lines until the transaction is complete: 
+            collector = collector + line.replace('\n',' ')
+            if '"S"' in collector or '"H"' in collector:
+                if "Anfangssaldo" in collector:
+                    pass
+                elif "Endsaldo" in collector:
+                    result = collector.split(';')
+                    date = result[0]
+                    amount = convert_value(result[11], result[12].replace('"',''))
+                    endsaldo = (convert_date(date),amount, linenumber)
+                else:
+                    values = collector.split(';')
+                    buchungstag.append(convert_date(values[0]))
+                    auftraggeber_empfaenger.append(values[3].replace('"',''))
+                    buchungstext.append('')
+                    verwendungszweck.append(values[8].replace('"',''))
+                    betrag.append(convert_value(values[11], collector[-3:]))
+                    kontostand.append(None)
+                    linenumbers.append(linenumber)
+                collector = ""
+
     return buchungstag, auftraggeber_empfaenger, buchungstext, verwendungszweck, betrag, kontostand, linenumbers, endsaldo
 
 def parse_csv_file_v2(filename):
@@ -250,33 +249,33 @@ def parse_csv_file_v2(filename):
     collector = ""
     linenumber = -1
     
-    f = open(filename, 'r', encoding = 'iso-8859-1')
-    for line in f:
-        linenumber += 1
-        #skip header
-        if header:
-            if "Valuta" in line:
-                header = False  
-            continue
-        
-        values = line.split(';')
-        if len(values[0]) == 0:
-            continue
-        if values[10] == 'Endsaldo':
-            date = convert_date(values[0])
-            amount = convert_value(values[12], values[13])
-            endsaldo = (date, amount, linenumber)
-        elif values[10] == 'Anfangssaldo':
-            continue
-        else:
-            buchungstag.append(convert_date(values[0]))
-            auftraggeber_empfaenger.append(values[4])
-            buchungstext.append('')
-            verwendungszweck.append(values[9])
-            betrag.append(convert_value(values[12], values[13]))
-            kontostand.append(None)
-            linenumbers.append(linenumber)
+    with open(filename, 'r', encoding = 'iso-8859-1') as f:
+        for line in f:
+            linenumber += 1
+            #skip header
+            if header:
+                if "Valuta" in line:
+                    header = False  
+                continue
             
+            values = line.split(';')
+            if len(values[0]) == 0:
+                continue
+            if values[10] == 'Endsaldo':
+                date = convert_date(values[0])
+                amount = convert_value(values[12], values[13])
+                endsaldo = (date, amount, linenumber)
+            elif values[10] == 'Anfangssaldo':
+                continue
+            else:
+                buchungstag.append(convert_date(values[0]))
+                auftraggeber_empfaenger.append(values[4])
+                buchungstext.append('')
+                verwendungszweck.append(values[9])
+                betrag.append(convert_value(values[12], values[13]))
+                kontostand.append(None)
+                linenumbers.append(linenumber)
+
     return buchungstag, auftraggeber_empfaenger, buchungstext, verwendungszweck, betrag, kontostand, linenumbers, endsaldo
 
 def parse_csv_file_v3(filename):
@@ -299,27 +298,27 @@ def parse_csv_file_v3(filename):
     collector = ""
     linenumber = -1
     
-    f = open(filename, 'r', encoding = 'iso-8859-1')
-    for line in f:
-        linenumber += 1
-        #skip header
-        if header:
-            if "Mandatsreferenz" in line:
-                header = False  
-            continue
-        
-        values = line.split(';')
-        if len(values[0]) == 0:
-            continue
-        
-        buchungstag.append(convert_date(values[4]))
-        auftraggeber_empfaenger.append(values[6])
-        buchungstext.append('')
-        verwendungszweck.append(values[10])
-        betrag.append(convert_value2(values[11]))
-        kontostand.append(convert_value2(values[13]))
-        linenumbers.append(linenumber)
-        
+    with open(filename, 'r', encoding = 'iso-8859-1') as f:
+        for line in f:
+            linenumber += 1
+            #skip header
+            if header:
+                if "Mandatsreferenz" in line:
+                    header = False  
+                continue
+            
+            values = line.split(';')
+            if len(values[0]) == 0:
+                continue
+            
+            buchungstag.append(convert_date(values[4]))
+            auftraggeber_empfaenger.append(values[6])
+            buchungstext.append('')
+            verwendungszweck.append(values[10])
+            betrag.append(convert_value2(values[11]))
+            kontostand.append(convert_value2(values[13]))
+            linenumbers.append(linenumber)
+
     endsaldo = (buchungstag[0], kontostand[0], linenumbers[0])
             
     return buchungstag, auftraggeber_empfaenger, buchungstext, verwendungszweck, betrag, kontostand, linenumbers, endsaldo
