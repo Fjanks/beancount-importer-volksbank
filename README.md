@@ -7,7 +7,10 @@ Maybe not every volksbank uses the same software, and some may use the same soft
 For more information on the importing process of Beancount see [Beancount's documentation on importing external data](https://beancount.github.io/docs/importing_external_data.html).
 
 # Installation
-Just copy the file 'beancount_importer_volksbank.py' to a place where python can find it. 
+This package can be installed using the following command:
+```shell
+pip install git+https://github.com/Fjanks/beancount-importer-volksbank.git
+```
 
 # Configuration
 
