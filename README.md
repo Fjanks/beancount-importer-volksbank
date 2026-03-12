@@ -38,3 +38,9 @@ The importer has some more options and parameters, see the docstring of Volksban
 ```bash
 python3 volksbank.py extract <filename>.csv
 ```
+
+## Development
+To run the included tests, run the following:
+```shell
+hatch test
+```

@@ -10,7 +10,6 @@ import datetime
 from beancount.core.number import D
 from beancount.core import data
 from beancount.core import amount
-from beancount.core import position
 from beangulp.importer import Importer
 from beancount import loader
 
@@ -132,7 +131,7 @@ class VolksbankImporter(Importer):
             raise IOError("Unknown file format.")
         #create transactions
         entries = []
-        for i in range(len(buchungstag)):
+        for i in range(len(buchungstag)).__reversed__():
             postings = self.guess_postings(auftraggeber_empfaenger[i], float(betrag[i]) ) 
             meta = data.new_metadata(filename, indices[i])
             txn = data.Transaction(meta, buchungstag[i], self.flag, auftraggeber_empfaenger[i], verwendungszweck[i], data.EMPTY_SET, data.EMPTY_SET, postings)
