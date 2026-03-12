@@ -40,7 +40,17 @@ python3 volksbank.py extract <filename>.csv
 ```
 
 ## Development
-To run the included tests, run the following:
+- To run the included tests, run the following:
 ```shell
 hatch test
+```
+
+- For fomatting and linting, use
+```shell
+hatch fmt
+```
+
+- For type checking, use
+```shell
+hatch run types:check
 ```

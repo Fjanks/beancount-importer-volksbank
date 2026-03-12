@@ -17,7 +17,7 @@ Konto;DE01234567890123456789;BIC;Bank Name;09.03.2026;09.03.2026;Transaction 1;D
 
         importer = VolksbankImporter("Assets:BankAccount", default_adjacent_account="Assets:UnknownAccount")
         assert(importer.identify(filename))
-        entries = importer.extract(filename, None)
+        entries = importer.extract(filename, [])
         self.assertEqualEntries(
             r"""
 2026-03-09 ! "Transaction 1" "Description 1"
