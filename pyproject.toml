@@ -32,3 +32,9 @@ dependencies = [
 [project.urls]
 Issues = "https://github.com/Fjanks/beancount-importer-volksbank/issues"
 Source = "https://github.com/Fjanks/beancount-importer-volksbank"
+
+[tool.hatch.envs.types]
+dependencies = ["mypy"]
+
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive beancount_importer_volksbank tests"

@@ -1,25 +1,25 @@
-# -*- coding: utf-8 -*-
 #
 # Beancount importer for csv exports from Volksbank or GLS Bank.
 # Author: Frank Stollmeier
 # License: GNU GPLv3
 #
 
+from __future__ import annotations
 
 import datetime
-from beancount.core.number import D
-from beancount.core import data
-from beancount.core import amount
-from beancount.core import position
-from beangulp.importer import Importer
+from typing import override
+
 from beancount import loader
+from beancount.core import amount, data
+from beancount.core.number import D
+from beangulp.importer import Importer
 
-
+_UNKNOWN_FILE_FORMAT_ERROR = "Unknown file format. Did you call `identify` before running `extract`?"
 
 class VolksbankImporter(Importer):
     '''An importer for CSV export from a Volksbank online banking.'''
 
-    def __init__(self, importing_account, default_adjacent_account = "Unknown:account", target_journal = None, currency = 'EUR', flag = '!'):
+    def __init__(self, importing_account: str, default_adjacent_account: str | None = "Unknown:account", target_journal: str | None = None, currency: str = 'EUR', flag: str | None = '!'):
         '''
         Parameters
         ----------
@@ -35,31 +35,31 @@ class VolksbankImporter(Importer):
         self.currency = currency
         self.flag = flag
         self.initialize_guessing()
-        self.file_format_version = None
-        
+        self.file_format_version: int | None = None
+
     def initialize_guessing(self):
         '''Create a dictionary of the previous transactions in 'target_journal', which can be used to guess the right postings for the new transactions.'''
-        self.posting_dict = dict()
-        if not (self.target_journal is None):
-            entries,errors,options = loader.load_file(self.target_journal)
+        self.posting_dict = {}
+        if self.target_journal is not None:
+            entries, _errors, _options = loader.load_file(self.target_journal)
             entries = [e for e in entries if isinstance(e, data.Transaction)]
             entries = sorted(entries, key = lambda e: e.date)
             for entry in entries:
-                if not (self._account in [p.account for p in entry.postings]):
+                if self._account not in [p.account for p in entry.postings]:
                     continue
                 if entry.payee is None:
                     continue
                 if len(entry.payee) == 0:
                     continue
-                if not entry.payee in self.posting_dict:
+                if entry.payee not in self.posting_dict:
                     self.posting_dict[entry.payee] = []
                 self.posting_dict[entry.payee].append(entry.postings)
 
-    def guess_postings(self, payee, total_transaction_value):
+    def guess_postings(self, payee: str, total_transaction_value: float):
         '''Guess postings based on the previous transactions with the same payee.
-        The guess is simply the most recent transaction with the same payee. If the transaction consists of multiple postings, the total_transaction_value is distributed to the postings in the same ratios as in the previous posting. 
-        If there is no previous transaction with the same payee, the target account is the default_adjacent_account. 
-        
+        The guess is simply the most recent transaction with the same payee. If the transaction consists of multiple postings, the total_transaction_value is distributed to the postings in the same ratios as in the previous posting.
+        If there is no previous transaction with the same payee, the target account is the default_adjacent_account.
+
         Parameters
         ----------
         payee:                      string
@@ -74,7 +74,7 @@ class VolksbankImporter(Importer):
                 accounts.append(prev_posting.account)
                 units.append(prev_posting.units)
                 if prev_posting.account == self._account:
-                    prev_posting_had_reversed_signs = 0 > float(prev_posting.units.number) * total_transaction_value
+                    prev_posting_had_reversed_signs = float(prev_posting.units.number) * total_transaction_value < 0
             s = sum([float(u.number) for u in units if u.number > 0])
             for account,unit in zip(accounts,units):
                 share = float(unit.number) / s
@@ -89,65 +89,66 @@ class VolksbankImporter(Importer):
                     i = j
             new_postings.append(new_postings.pop(i))
         else:
-            if self.default_adjacent_account != None:
+            if self.default_adjacent_account is not None:
                 new_postings.append(data.Posting(self.default_adjacent_account, amount.Amount(D(str(-total_transaction_value)), self.currency), None, None, None, None))
             new_postings.append(data.Posting(self._account, amount.Amount(D(str(total_transaction_value)), self.currency), None, None, None, None))
         return new_postings
-        
-    def identify(self, filename):
+
+    @override
+    def identify(self, filename: str):
         header_version1 = '"Buchungstag";"Valuta";"Auftraggeber/Zahlungsempfänger";"Empfänger/Zahlungspflichtiger";"Konto-Nr.";"IBAN";"BLZ";"BIC";"Vorgang/Verwendungszweck";"Kundenreferenz";"Währung";"Umsatz";" "'
         header_version2 = "Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;ZahlungsempfängerKto;ZahlungsempfängerIBAN;ZahlungsempfängerBLZ;ZahlungsempfängerBIC;Vorgang/Verwendungszweck;Kundenreferenz;Währung;Umsatz;Soll/Haben"
         header_version3 = "Bezeichnung Auftragskonto;IBAN Auftragskonto;BIC Auftragskonto;Bankname Auftragskonto;Buchungstag;Valutadatum;Name Zahlungsbeteiligter;IBAN Zahlungsbeteiligter;BIC (SWIFT-Code) Zahlungsbeteiligter;Buchungstext;Verwendungszweck;Betrag;Waehrung;Saldo nach Buchung;Bemerkung;Kategorie;Steuerrelevant;Glaeubiger ID;Mandatsreferenz"
         header_version4 = "Bezeichnung Auftragskonto;IBAN Auftragskonto;BIC Auftragskonto;Bankname Auftragskonto;Buchungstag;Valutadatum;Name Zahlungsbeteiligter;IBAN Zahlungsbeteiligter;BIC (SWIFT-Code) Zahlungsbeteiligter;Buchungstext;Verwendungszweck;Betrag;Waehrung;Saldo nach Buchung;Bemerkung;Gekennzeichneter Umsatz;Glaeubiger ID;Mandatsreferenz"
-        with open(filename, "r", encoding = "ISO-8859-1") as f:
+        with open(filename, encoding = "ISO-8859-1") as f:
             for line in f:
                 if header_version1 in line:
                     self.file_format_version = 1
                     return True
-                elif header_version2 in line:
+                if header_version2 in line:
                     self.file_format_version = 2
                     return True
-                elif header_version3 in line:
+                if header_version3 in line:
                     self.file_format_version = 3
                     return True
-                elif header_version4 in line:
+                if header_version4 in line:
                     self.file_format_version = 4
                     return True
             return False
 
-    def account(self, file):
+    @override
+    def account(self, file: str):
         return self._account
 
-    def extract(self, filename, _):
+    @override
+    def extract(self, filename: str, _: data.Entries):
         #parse csv file
         if self.file_format_version == 1:
-            buchungstag, auftraggeber_empfaenger, buchungstext, verwendungszweck, betrag, kontostand, indices, endsaldo = parse_csv_file_v1(filename)
+            buchungstag, auftraggeber_empfaenger, _buchungstext, verwendungszweck, betrag, _kontostand, indices, endsaldo = parse_csv_file_v1(filename)
         elif self.file_format_version == 2:
-            buchungstag, auftraggeber_empfaenger, buchungstext, verwendungszweck, betrag, kontostand, indices, endsaldo = parse_csv_file_v2(filename)
-        elif self.file_format_version == 3:
-            buchungstag, auftraggeber_empfaenger, buchungstext, verwendungszweck, betrag, kontostand, indices, endsaldo = parse_csv_file_v3(filename)
-        elif self.file_format_version == 4:
-            buchungstag, auftraggeber_empfaenger, buchungstext, verwendungszweck, betrag, kontostand, indices, endsaldo = parse_csv_file_v3(filename)    
+            buchungstag, auftraggeber_empfaenger, _buchungstext, verwendungszweck, betrag, _kontostand, indices, endsaldo = parse_csv_file_v2(filename)
+        elif self.file_format_version in {3, 4}:
+            buchungstag, auftraggeber_empfaenger, _buchungstext, verwendungszweck, betrag, _kontostand, indices, endsaldo = parse_csv_file_v3(filename)
         else:
-            raise IOError("Unknown file format.")
+            raise OSError(_UNKNOWN_FILE_FORMAT_ERROR)
         #create transactions
-        entries = []
-        for i in range(len(buchungstag)):
-            postings = self.guess_postings(auftraggeber_empfaenger[i], float(betrag[i]) ) 
+        entries: data.Entries = []
+        for i in range(len(buchungstag)).__reversed__():
+            postings = self.guess_postings(auftraggeber_empfaenger[i], float(betrag[i]) )
             meta = data.new_metadata(filename, indices[i])
             txn = data.Transaction(meta, buchungstag[i], self.flag, auftraggeber_empfaenger[i], verwendungszweck[i], data.EMPTY_SET, data.EMPTY_SET, postings)
             entries.append(txn)
         #create balance
         meta = data.new_metadata(filename, endsaldo[2])
         entries.append( data.Balance(meta, endsaldo[0] + datetime.timedelta(days=1), self._account, amount.Amount(D(endsaldo[1]), self.currency), None, None) )
-        
+
         return entries
 
 
-def convert_value(value, soll_haben):
+def convert_value(value: str, soll_haben: str):
     '''Convert number format from the CSV file and add sign +/- depending on Soll/Haben (Credit/Debit).
     Example:  convert_value('1.200,30', 'S') returns '-1200.30'.
-    
+
     Parameters
     ----------
     value:      string, number with ',' as decimal separator and '.' as thousand-separator
@@ -155,18 +156,18 @@ def convert_value(value, soll_haben):
     '''
     return ('-' if ('S' in soll_haben) else '') + value.replace('.','').replace(',','.').replace('"','')
 
-def convert_value2(value):
+def convert_value2(value: str):
     '''Convert signed numbers from the CSV file. For unsigned number with Soll/Haben see convert_value().
-    
+
     Parameters
     ----------
     value:     string, like '-4,7' or '5,21'
     '''
     return value.replace('.','').replace(',','.')
 
-def convert_date(date):
+def convert_date(date: str):
     '''Convert date from the CSV file (format '04.10.2020') to datetime.
-    
+
     Parameters
     ----------
     date:       string
@@ -175,9 +176,9 @@ def convert_date(date):
     return datetime.date(int(year),int(month),int(day))
 
 
-def parse_csv_file_v1(filename):
+def parse_csv_file_v1(filename: str):
     '''Parse CSV file.
-    
+
     Parameters
     ----------
     filename:   string
@@ -187,26 +188,26 @@ def parse_csv_file_v1(filename):
     buchungstext = []
     verwendungszweck = []
     betrag = []
-    kontostand = []
+    kontostand: list[str | None] = []
     endsaldo = None
-    
+
     linenumbers = []
     header = True
     collector = ""
     linenumber = -1
-    
-    with open(filename, 'r', encoding = 'iso-8859-1') as f:
+
+    with open(filename, encoding = 'iso-8859-1') as f:
         for line in f:
             linenumber += 1
             #skip header
             if header:
                 if "Valuta" in line:
-                    header = False  
+                    header = False
                 continue
             #skip empty lines
             if len(line) == 0:
                 continue
-            #Each transaction in the csv file is splitted over several lines, so we have to collect the content of several lines until the transaction is complete: 
+            #Each transaction in the csv file is splitted over several lines, so we have to collect the content of several lines until the transaction is complete:
             collector = collector + line.replace('\n',' ')
             if '"S"' in collector or '"H"' in collector:
                 if "Anfangssaldo" in collector:
@@ -229,9 +230,9 @@ def parse_csv_file_v1(filename):
 
     return buchungstag, auftraggeber_empfaenger, buchungstext, verwendungszweck, betrag, kontostand, linenumbers, endsaldo
 
-def parse_csv_file_v2(filename):
+def parse_csv_file_v2(filename: str):
     '''Parse CSV file with the new file format they started to use at the beginning of 2022.
-    
+
     Parameters
     ----------
     filename:   string
@@ -241,23 +242,22 @@ def parse_csv_file_v2(filename):
     buchungstext = []
     verwendungszweck = []
     betrag = []
-    kontostand = []
+    kontostand: list[str | None] = []
     endsaldo = None
-    
+
     linenumbers = []
     header = True
-    collector = ""
     linenumber = -1
-    
-    with open(filename, 'r', encoding = 'iso-8859-1') as f:
+
+    with open(filename, encoding = 'iso-8859-1') as f:
         for line in f:
             linenumber += 1
             #skip header
             if header:
                 if "Valuta" in line:
-                    header = False  
+                    header = False
                 continue
-            
+
             values = line.split(';')
             if len(values[0]) == 0:
                 continue
@@ -278,9 +278,9 @@ def parse_csv_file_v2(filename):
 
     return buchungstag, auftraggeber_empfaenger, buchungstext, verwendungszweck, betrag, kontostand, linenumbers, endsaldo
 
-def parse_csv_file_v3(filename):
+def parse_csv_file_v3(filename: str):
     '''Parse CSV file with the new file format they started to use at the beginning of 2022.
-    
+
     Parameters
     ----------
     filename:   string
@@ -292,25 +292,24 @@ def parse_csv_file_v3(filename):
     betrag = []
     kontostand = []
     endsaldo = None
-    
+
     linenumbers = []
     header = True
-    collector = ""
     linenumber = -1
-    
-    with open(filename, 'r', encoding = 'iso-8859-1') as f:
+
+    with open(filename, encoding = 'iso-8859-1') as f:
         for line in f:
             linenumber += 1
             #skip header
             if header:
                 if "Mandatsreferenz" in line:
-                    header = False  
+                    header = False
                 continue
-            
+
             values = line.split(';')
             if len(values[0]) == 0:
                 continue
-            
+
             buchungstag.append(convert_date(values[4]))
             auftraggeber_empfaenger.append(values[6])
             buchungstext.append('')
@@ -320,5 +319,5 @@ def parse_csv_file_v3(filename):
             linenumbers.append(linenumber)
 
     endsaldo = (buchungstag[0], kontostand[0], linenumbers[0])
-            
+
     return buchungstag, auftraggeber_empfaenger, buchungstext, verwendungszweck, betrag, kontostand, linenumbers, endsaldo
